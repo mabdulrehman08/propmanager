@@ -31,6 +31,8 @@ interface DashboardStats {
   occupancyRate: number;
   totalMonthlyIncome: number;
   outstandingRent: number;
+  totalCollectedAllTime: number;
+  totalRentAllTime: number;
   last6Months: {
     month: string;
     year: number;
@@ -43,6 +45,11 @@ interface DashboardStats {
     leaseEnd: string;
     unitId: number;
   }[];
+  ownerSettlementSummary: {
+    totalEarned: number;
+    totalDistributed: number;
+    pendingSettlement: number;
+  } | null;
 }
 
 const COLORS = [
@@ -192,6 +199,52 @@ export default function Dashboard() {
           testId="stat-outstanding"
         />
       </div>
+
+      {(stats.totalCollectedAllTime > 0 || stats.ownerSettlementSummary) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-5">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Total Collected (All Time)
+              </span>
+              <p className="text-xl font-bold mt-1" data-testid="stat-all-time-collected">
+                {formatCurrency(stats.totalCollectedAllTime)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                of {formatCurrency(stats.totalRentAllTime)} expected
+              </p>
+            </CardContent>
+          </Card>
+          {stats.ownerSettlementSummary && (
+            <>
+              <Card>
+                <CardContent className="p-5">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Your Total Share
+                  </span>
+                  <p className="text-xl font-bold mt-1" data-testid="stat-owner-earned">
+                    {formatCurrency(stats.ownerSettlementSummary.totalEarned)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Distributed: {formatCurrency(stats.ownerSettlementSummary.totalDistributed)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-5">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Pending Settlement
+                  </span>
+                  <p className="text-xl font-bold mt-1 text-orange-600" data-testid="stat-owner-pending">
+                    {formatCurrency(stats.ownerSettlementSummary.pendingSettlement)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Awaiting distribution</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2">

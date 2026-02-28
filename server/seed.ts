@@ -1,18 +1,46 @@
 import { storage } from "./storage";
-import { db } from "./db";
-import { properties, units, tenants, rentInvoices } from "@shared/schema";
-import { sql } from "drizzle-orm";
+import { hashPassword } from "./auth";
 
 export async function seedDatabase() {
-  const existing = await storage.getProperties();
-  if (existing.length > 0) return;
+  const existingUsers = await storage.getUsers();
+  if (existingUsers.length > 0) return;
+
+  const adminPassword = await hashPassword("admin123");
+  const admin = await storage.createUser({
+    username: "admin",
+    password: adminPassword,
+    fullName: "Super Admin",
+    email: "admin@propmanager.pk",
+    phone: "+92-300-0000000",
+    role: "super_admin",
+  });
+
+  const ownerPassword = await hashPassword("owner123");
+  const owner1 = await storage.createUser({
+    username: "ahmed_owner",
+    password: ownerPassword,
+    fullName: "Ahmed Rehman",
+    email: "ahmed@propmanager.pk",
+    phone: "+92-300-1111111",
+    role: "property_owner",
+  });
+
+  const owner2 = await storage.createUser({
+    username: "sara_owner",
+    password: ownerPassword,
+    fullName: "Sara Malik",
+    email: "sara@propmanager.pk",
+    phone: "+92-321-2222222",
+    role: "co_owner",
+  });
 
   const prop1 = await storage.createProperty({
     name: "Sunset Heights",
     address: "45 Main Boulevard, Gulberg III, Lahore",
     type: "residential",
-    ownershipType: "single",
+    ownershipType: "multi",
     totalUnits: 4,
+    createdById: owner1.id,
   });
 
   const prop2 = await storage.createProperty({
@@ -21,6 +49,7 @@ export async function seedDatabase() {
     type: "commercial",
     ownershipType: "single",
     totalUnits: 3,
+    createdById: owner1.id,
   });
 
   const prop3 = await storage.createProperty({
@@ -29,6 +58,7 @@ export async function seedDatabase() {
     type: "residential",
     ownershipType: "multi",
     totalUnits: 6,
+    createdById: owner1.id,
   });
 
   const prop4 = await storage.createProperty({
@@ -37,7 +67,15 @@ export async function seedDatabase() {
     type: "commercial",
     ownershipType: "single",
     totalUnits: 2,
+    createdById: owner1.id,
   });
+
+  await storage.createPropertyUser({ userId: owner1.id, propertyId: prop1.id, role: "property_owner", status: "approved", ownershipPercent: "60" });
+  await storage.createPropertyUser({ userId: owner2.id, propertyId: prop1.id, role: "co_owner", status: "approved", ownershipPercent: "40" });
+  await storage.createPropertyUser({ userId: owner1.id, propertyId: prop2.id, role: "property_owner", status: "approved", ownershipPercent: "100" });
+  await storage.createPropertyUser({ userId: owner1.id, propertyId: prop3.id, role: "property_owner", status: "approved", ownershipPercent: "50" });
+  await storage.createPropertyUser({ userId: owner2.id, propertyId: prop3.id, role: "co_owner", status: "approved", ownershipPercent: "50" });
+  await storage.createPropertyUser({ userId: owner1.id, propertyId: prop4.id, role: "property_owner", status: "approved", ownershipPercent: "100" });
 
   const u1 = await storage.createUnit({ propertyId: prop1.id, unitName: "Apt 101", monthlyRent: "45000" });
   const u2 = await storage.createUnit({ propertyId: prop1.id, unitName: "Apt 102", monthlyRent: "50000" });
@@ -59,7 +97,7 @@ export async function seedDatabase() {
   const u15 = await storage.createUnit({ propertyId: prop4.id, unitName: "Suite 2", monthlyRent: "80000" });
 
   const t1 = await storage.createTenant({ unitId: u1.id, name: "Ahmed Khan", phone: "+92-300-1234567", email: "ahmed.khan@email.com", leaseStart: "2025-01-01", leaseEnd: "2026-12-31", securityDeposit: "90000", rentDueDay: 5, isActive: 1 });
-  const t2 = await storage.createTenant({ unitId: u2.id, name: "Sara Malik", phone: "+92-321-9876543", email: "sara.malik@email.com", leaseStart: "2025-03-01", leaseEnd: "2026-02-28", securityDeposit: "100000", rentDueDay: 1, isActive: 1 });
+  const t2 = await storage.createTenant({ unitId: u2.id, name: "Zainab Fatima", phone: "+92-321-9876543", email: "zainab.f@email.com", leaseStart: "2025-03-01", leaseEnd: "2026-02-28", securityDeposit: "100000", rentDueDay: 1, isActive: 1 });
   const t3 = await storage.createTenant({ unitId: u3.id, name: "Bilal Hussain", phone: "+92-333-4567890", email: "bilal.h@email.com", leaseStart: "2024-06-15", leaseEnd: "2026-06-14", securityDeposit: "110000", rentDueDay: 10, isActive: 1 });
   const t4 = await storage.createTenant({ unitId: u5.id, name: "TechCorp Solutions", phone: "+92-21-35678901", email: "info@techcorp.pk", leaseStart: "2025-01-01", leaseEnd: "2027-12-31", securityDeposit: "360000", rentDueDay: 1, isActive: 1 });
   const t5 = await storage.createTenant({ unitId: u6.id, name: "Global Trading LLC", phone: "+92-21-34567890", email: "accounts@globaltrading.pk", leaseStart: "2025-02-01", leaseEnd: "2026-01-31", securityDeposit: "285000", rentDueDay: 5, isActive: 1 });
@@ -134,7 +172,7 @@ export async function seedDatabase() {
         paidAmount,
         paidDate,
         paymentMethod,
-        receiptNumber: `RNT-${y}${String(m).padStart(2, "0")}-${t.id}`,
+        receiptNumber: `INV-${y}${String(m).padStart(2, "0")}-${t.id}`,
       });
     }
   }

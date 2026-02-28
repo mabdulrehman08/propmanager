@@ -1,10 +1,15 @@
 import { useLocation, Link } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard,
   Building2,
   Users,
   Receipt,
-  TrendingUp,
+  Wallet,
+  CreditCard,
+  Shield,
+  LogOut,
+  User,
 } from "lucide-react";
 import {
   Sidebar,
@@ -18,16 +23,27 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Properties", url: "/properties", icon: Building2 },
   { title: "Tenants", url: "/tenants", icon: Users },
   { title: "Rent Collection", url: "/rent", icon: Receipt },
+  { title: "Settlements", url: "/settlements", icon: Wallet },
+  { title: "Payments", url: "/payments", icon: CreditCard },
+];
+
+const adminItems = [
+  { title: "Audit Logs", url: "/audit-logs", icon: Shield },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
+
+  const allItems = user?.role === "super_admin" ? [...navItems, ...adminItems] : navItems;
 
   return (
     <Sidebar>
@@ -41,7 +57,7 @@ export function AppSidebar() {
               PropManager
             </span>
             <span className="text-xs text-muted-foreground">
-              Property Management
+              Multi-Owner Platform
             </span>
           </div>
         </div>
@@ -51,7 +67,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {allItems.map((item) => {
                 const isActive =
                   item.url === "/"
                     ? location === "/"
@@ -75,11 +91,30 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <TrendingUp className="h-3 w-3" />
-          <span>v1.0 MVP</span>
-        </div>
+      <SidebarFooter className="p-4 space-y-3">
+        {user && (
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+              <User className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" data-testid="text-user-name">{user.fullName}</p>
+              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                {user.role.replace(/_/g, " ")}
+              </Badge>
+            </div>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          data-testid="button-logout"
+          onClick={() => logout.mutate()}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );

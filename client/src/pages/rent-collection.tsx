@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Filter,
   CreditCard,
+  History,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -181,6 +182,118 @@ function PaymentDialog({
   );
 }
 
+function ReconstructDialog({
+  open,
+  onOpenChange,
+  units,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  units: Unit[];
+}) {
+  const { toast } = useToast();
+  const [unitId, setUnitId] = useState("");
+  const [currentRent, setCurrentRent] = useState("");
+  const [yearlyRate, setYearlyRate] = useState("10");
+  const [startYear, setStartYear] = useState("2015");
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/units/${unitId}/reconstruct-history`, {
+        currentRent: parseFloat(currentRent),
+        yearlyIncreasePercent: parseFloat(yearlyRate),
+        startYear: parseInt(startYear),
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({
+        title: "History reconstructed",
+        description: `Generated ${data.generated} historical records from ${startYear}.`,
+      });
+      onOpenChange(false);
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="w-5 h-5" />
+            Reconstruct Rent History
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Reverse-compound the current rent to reconstruct monthly records back to a starting year using a yearly increase percentage.
+          </p>
+          <div>
+            <Label>Unit</Label>
+            <Select value={unitId} onValueChange={setUnitId}>
+              <SelectTrigger data-testid="select-reconstruct-unit">
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {units.map((u) => (
+                  <SelectItem key={u.id} value={String(u.id)}>
+                    {u.unitName} ({formatCurrency(u.monthlyRent)}/mo)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Current Monthly Rent (PKR)</Label>
+            <Input
+              type="number"
+              data-testid="input-current-rent"
+              value={currentRent}
+              onChange={(e) => setCurrentRent(e.target.value)}
+              placeholder="e.g. 80000"
+            />
+          </div>
+          <div>
+            <Label>Yearly Increase %</Label>
+            <Input
+              type="number"
+              data-testid="input-yearly-rate"
+              value={yearlyRate}
+              onChange={(e) => setYearlyRate(e.target.value)}
+              placeholder="e.g. 10"
+            />
+          </div>
+          <div>
+            <Label>Start Year</Label>
+            <Select value={startYear} onValueChange={setStartYear}>
+              <SelectTrigger data-testid="select-start-year">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => 2015 + i).map(y => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            className="w-full"
+            data-testid="button-reconstruct"
+            onClick={() => mutation.mutate()}
+            disabled={!unitId || !currentRent || mutation.isPending}
+          >
+            {mutation.isPending ? "Reconstructing..." : "Reconstruct History"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function RentCollection() {
   const { toast } = useToast();
   const now = new Date();
@@ -188,6 +301,7 @@ export default function RentCollection() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [payInvoice, setPayInvoice] = useState<RentInvoice | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [reconstructOpen, setReconstructOpen] = useState(false);
 
   const { data: invoices, isLoading } = useQuery<RentInvoice[]>({
     queryKey: ["/api/invoices"],
@@ -260,7 +374,7 @@ export default function RentCollection() {
     : null;
 
   const years = [];
-  for (let y = now.getFullYear() - 1; y <= now.getFullYear() + 1; y++) {
+  for (let y = 2015; y <= now.getFullYear() + 1; y++) {
     years.push(y);
   }
 
@@ -278,21 +392,31 @@ export default function RentCollection() {
             Track and manage monthly rent payments
           </p>
         </div>
-        <Button
-          onClick={() =>
-            generateMutation.mutate({
-              month: selectedMonth,
-              year: selectedYear,
-            })
-          }
-          disabled={generateMutation.isPending}
-          data-testid="button-generate-invoices"
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-1 ${generateMutation.isPending ? "animate-spin" : ""}`}
-          />
-          Generate Invoices
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setReconstructOpen(true)}
+            data-testid="button-reconstruct-history"
+          >
+            <History className="h-4 w-4 mr-1" />
+            Reconstruct History
+          </Button>
+          <Button
+            onClick={() =>
+              generateMutation.mutate({
+                month: selectedMonth,
+                year: selectedYear,
+              })
+            }
+            disabled={generateMutation.isPending}
+            data-testid="button-generate-invoices"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-1 ${generateMutation.isPending ? "animate-spin" : ""}`}
+            />
+            Generate Invoices
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
@@ -495,6 +619,14 @@ export default function RentCollection() {
             if (!open) setPayInvoice(null);
           }}
           invoice={payInvoice}
+        />
+      )}
+
+      {allUnits && (
+        <ReconstructDialog
+          open={reconstructOpen}
+          onOpenChange={setReconstructOpen}
+          units={allUnits}
         />
       )}
     </div>
